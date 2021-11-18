@@ -19,3 +19,8 @@ install dependencies
 conda install -y matplotlib cvxopt scipy
 ```
 
+## Running the example program
+```
+conda activate cbf
+cd robotarium_python_simulator
+python obstacle_avoiding_consensus.py 
