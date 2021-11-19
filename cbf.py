@@ -3,7 +3,7 @@ import cvxopt
 import sys
 
 class ControlBarrierFunction():
-    def __init__(self, max_speed, dmin = 0.12, k = 1):
+    def __init__(self, max_speed, dmin = 0.2, k = 1):
         """
         Args:
             dmin: dmin for bx
@@ -38,21 +38,24 @@ class ControlBarrierFunction():
         for i, obs_state in enumerate(obs_states):
             d = np.array(robot_state - obs_state)
             d_pos = d[:2] # pos distance
+            d_vel = d[2:] # vel 
             d_abs = np.linalg.norm(d_pos)
             # the goal is to make the value of h always greater than 0
             # h measure the relative distance between robot and obstacle
             # you can think other robots as dynamic obstacles 
             # here I calculate the positive distance between them
-            hs_p = np.array([1,1])
+            hs_p = np.array([1,1,self.k, self.k])
             if (d_pos[0] < 0):
                 hs_p[0] = -1
+                hs_p[2] = -self.k
             if (d_pos[1] < 0):
                 hs_p[1] = -1
+                hs_p[3] = -self.k
             
             L_f = hs_p @ (f @ d.reshape((-1,1))) # shape (1, 1)
             L_g = -hs_p @ g # shape (1, 2) g contains x information
             L_gs.append(L_g)
-            reference_control_laws.append(hs_p @ d.reshape((-1,1)) - self.dmin + \
+            reference_control_laws.append(self.gamma*(hs_p @ d.reshape((-1,1)) - self.dmin) + \
                                             L_f + np.dot(hs_p, np.dot(g, u0)))
         
         # Solve safe optimization problem
@@ -60,9 +63,11 @@ class ControlBarrierFunction():
         u0 = u0.reshape(-1,1)
         Q = cvxopt.matrix(np.eye(2))
         p = cvxopt.matrix(np.zeros(2).reshape(-1,1))
-        G = cvxopt.matrix(np.vstack([np.eye(2), -np.eye(2)]))
+        G = cvxopt.matrix(np.vstack([np.eye(2), -np.eye(2), np.array([[1,0],[-1,0]]), np.array([[0,1],[0,-1]])]))
         S_saturated = cvxopt.matrix(np.array([self.max_speed-u0[0][0], self.max_speed+u0[0][0], \
-                                                self.max_speed-u0[1][0], self.max_speed+u0[1][0]]).reshape(-1, 1))
+                                            self.max_speed-u0[1][0], self.max_speed+u0[1][0], \
+                                            self.max_speed-robot_state[2]-u0[0][0], self.max_speed+robot_state[2]+u0[0][0], \
+                                            self.max_speed-robot_state[3]-u0[1][0], self.max_speed+robot_state[3]+u0[1][0]]).reshape(-1, 1))
 
         L_gs = np.array(L_gs).reshape(-1, 2)
         reference_control_laws = np.array(reference_control_laws).reshape(-1,1)
@@ -78,6 +83,7 @@ class ControlBarrierFunction():
                 break
             except ValueError:
                 for i in range(len(reference_control_laws)):
+                    #print("here")
                     reference_control_laws[i][0] += 1
 
         u = np.array([u[0]+u0[0][0], u[1]+u0[1][0]])
