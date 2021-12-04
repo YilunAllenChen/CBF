@@ -94,7 +94,7 @@ class ControlBarrierFunction():
 if __name__ == "__main__":
     # max_speed is depend on robot, and dmin is user define the safety distance
     # I suggest to make dmin larger than collision distance
-    cbf_controller = ControlBarrierFunction(max_speed = 0.2, dmin = 0.12) 
+    cbf_controller = ControlBarrierFunction(max_speed = 0.2, dmin = 0.15) 
     robot_state = np.array([0.1, 0.1])
     unsafe_obstacles = np.array([[0.08, 0.14], [0.12, 0.09], [0.12, 0.12]])
     # dynamic model parameters, this is double integrator model
