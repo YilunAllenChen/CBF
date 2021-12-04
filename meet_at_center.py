@@ -28,22 +28,22 @@ robot_dynamics_gx = 0.1*np.array([[1,0],[0,1],[0,0],[0,0]])
 
 
 # Instantiate Robotarium object
-N = 12
+N = 10
 h = 0.5
 
 
 # Create initial conditions. The dimensions are (number of agents, 3(x, y, heading))
 # 6 obstacle agents form a smaller circle around the center. 6 free agents form a bigger circle of the same origin.
-initial_conditions = np.zeros((12, 3))
+initial_conditions = np.zeros((N, 3))
 center = np.array([0, 0, 0])
-num_agents_in_circles = 6
-diameter = 1
-for i in range(6):
+num_agents_in_circles = 5
+diameter = 0.7
+for i in range(5):
     theta = i * (2 * np.pi / num_agents_in_circles)
     initial_conditions[i] = center + [diameter * np.cos(theta), diameter * np.sin(theta), theta + (2/3 * np.pi)]
-for i in range(6, 12):
-    theta = i * (2 * np.pi / num_agents_in_circles)
-    initial_conditions[i] = center + [2 * diameter * np.cos(theta), 2 * diameter * np.sin(theta), theta + (2/3 * np.pi)]
+for i in range(5, N):
+    theta = i * (2 * np.pi / num_agents_in_circles) + np.pi/5
+    initial_conditions[i] = center + [1.5 * diameter * np.cos(theta), 1.5 * diameter * np.sin(theta), theta + (2/3 * np.pi)]
 # transpose the initial condition array to comply with robotarium's requirement.
 initial_conditions = initial_conditions.transpose()
 
@@ -63,12 +63,11 @@ si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping()
 
 # Laplacian used by the obstacle agents in cyclic pursuit.
 L1 = np.array([
-    [-1,  1,  0,  0,  0,  0],
-    [ 0, -1,  1,  0,  0,  0],
-    [ 0,  0, -1,  1,  0,  0],
-    [ 0,  0,  0, -1,  1,  0],
-    [ 0,  0,  0,  0, -1,  1],
-    [ 1,  0,  0,  0,  0, -1],
+    [-1,  1,  0,  0,  0],
+    [ 0, -1,  1,  0,  0],
+    [ 0,  0, -1,  1,  0],
+    [ 0,  0,  0, -1,  1],
+    [ 1,  0,  0,  0, -1],
 ])
 
 # Laplacian used by free agents to rendezvous.
@@ -113,8 +112,8 @@ for k in range(iterations):
     # Test snippet: let all agents be equipped with custom-implemented CBF.
     # obtain and divide the states.
     states = np.concatenate((x[:2, :], si_velocities), axis=0).transpose()
-    obstacle_states = states[:6]
-    agent_states = states[6:]
+    obstacle_states = states[:5]
+    agent_states = states[5:]
     safety_distance = 0.2
     for i in range(int(N/2), N):
         

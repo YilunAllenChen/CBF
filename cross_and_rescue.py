@@ -28,31 +28,39 @@ robot_dynamics_gx = 0.1*np.array([[1,0],[0,1],[0,0],[0,0]])
 
 
 # Instantiate Robotarium object
-N = 12
+N_robots = 5
+N_obs = 6
 h = 0.5
 
 
 # Create initial conditions. The dimensions are (number of agents, 3(x, y, heading))
 # 6 obstacle agents form a smaller circle around the center. 6 free agents form a bigger circle of the same origin.
-initial_conditions = np.zeros((12, 3))
-center = np.array([0, 0, 0])
-num_agents_in_circles = 6
-diameter = 0.8
-for i in range(6):
-    theta = i * (2 * np.pi / num_agents_in_circles)
-    initial_conditions[i] = center + [diameter * np.cos(theta), diameter * np.sin(theta), theta + (2/3 * np.pi)]
-for i in range(6, 11):
-    theta = i * (2 * np.pi / num_agents_in_circles)
-    initial_conditions[i] = center + [0.5 * diameter * np.cos(theta) - 1.5, 0.5 * diameter * np.sin(theta), theta + (2/3 * np.pi)]
-initial_conditions[11] = [1.5,0,0]
+initial_conditions_robots = np.zeros((N_robots, 3))
+initial_conditions_obs = np.zeros((N_obs, 2))
+center_obs = np.array([0, 0])
+center_robots = np.array([0, 0, 0])
+diameter = 0.6
+for i in range(N_obs):
+    theta = i * (2 * np.pi / N_obs)
+    initial_conditions_obs[i] = center_obs + [diameter * np.cos(theta), diameter * np.sin(theta)]
+for i in range(N_robots):
+    theta = i * (2 * np.pi / N_robots)
+    initial_conditions_robots[i] = center_robots + [0.6 * diameter * np.cos(theta) - 1.15, 0.6 * diameter * np.sin(theta), theta + (2/3 * np.pi)]
 # transpose the initial condition array to comply with robotarium's requirement.
-initial_conditions = initial_conditions.transpose()
-
+initial_conditions_robots = initial_conditions_robots.transpose()
+initial_conditions_obs = initial_conditions_obs.transpose()
+obs_pos=initial_conditions_obs
 # instantiate robotarium.
-r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=True, initial_conditions=initial_conditions)
-
+r = robotarium.Robotarium(number_of_robots=N_robots, show_figure=True, sim_in_real_time=True, initial_conditions=initial_conditions_robots)
+# Plot virtual obstacles
+safety_radius = 0.06
+safety_radius_marker_size = determine_marker_size(r,safety_radius) # Will scale the plotted markers to be the diameter of provided argument (in meters)
+g = r.axes.scatter(initial_conditions_obs[0,:], initial_conditions_obs[1,:], s=np.pi/4*safety_radius_marker_size, marker='o', facecolors='none',edgecolors=[1,0,0],linewidth=3)
+h = r.axes.scatter(1.5, 0, s=np.pi/4*safety_radius_marker_size, marker='o', facecolors=[0,1,0],edgecolors=[0,1,0],linewidth=3)
+f = r.axes.scatter(0, 0, s=np.pi/4*safety_radius_marker_size, marker='o', facecolors='none',edgecolors=[1,0,0],linewidth=3)
 # How many iterations do we want (about N*0.033 seconds)
 iterations = 1000
+T = 1/30
 
 # We're working in single-integrator dynamics, and we don't want the robots
 # to collide or drive off the testbed.  Thus, we're going to use barrier certificates
@@ -87,47 +95,43 @@ for k in range(iterations):
     # Get the poses of the robots and convert to single-integrator poses
     x = r.get_poses()
     x_si = uni_to_si_states(x)
-
+    x_si = np.concatenate((x_si,np.array([[1.5],[0]])),axis=1)
     # Initialize the single-integrator control inputs
-    si_velocities = np.zeros((2, N))
-
+    si_velocities = np.zeros((2, N_robots))
+    obs_velocities = np.zeros((2, N_obs))
+    
     # For obstacle robots...
-    for i in range(int(N/2)):
+    for i in range(int(N_obs)):
         # Get the neighbors of robot 'i' (encoded in the graph Laplacian)
         j = topological_neighbors(L1, i)
-        theta = - np.pi / num_agents_in_circles
+        theta = - np.pi / N_obs
 
         # rotate the agent's desired direction so that the circle is maintained (doesn't converge).
         rotation = np.array([
             [np.cos(theta), np.sin(theta)],
             [-np.sin(theta), np.cos(theta)]
         ]) 
-        si_velocities[:, i] = np.sum(x_si[:, j] - x_si[:, i, None], 1) @ rotation * 0.5
+        obs_velocities[:, i] = np.sum(obs_pos[:, j] - obs_pos[:, i, None], 1) @ rotation * 0.1
 
     # For free agents...
-    for i in range(int(N/2), N):
+    for i in range(int(N_robots)):
         # Get the neighbors of robot 'i' (encoded in the graph Laplacian)
-        j = topological_neighbors(L2, i-int(N/2)) + int(N/2)
+        j = topological_neighbors(L2, i)
         # Compute the consensus algorithm
         si_velocities[:, i] = np.sum(x_si[:, j] - x_si[:, i, None], 1)
 
 
-
-    
-    # Use the barrier certificate to avoid collisions (Robotarium Official)
-    # si_velocities = si_barrier_cert(si_velocities, x_si)
-
-
     # Test snippet: let all agents be equipped with custom-implemented CBF.
     # obtain and divide the states.
-    states = np.concatenate((x[:2, :], si_velocities), axis=0).transpose()
-    obstacle_states = states[:6]
-    agent_states = states[6:]
-    safety_distance = 0.25
-    for i in range(int(N/2), N-1):
+    obs_pos=np.concatenate((obs_pos,np.zeros((2,1))),axis=1)
+    obs_velocities=np.concatenate((obs_velocities,np.zeros((2,1))),axis=1)
+    obstacle_states = np.concatenate((obs_pos, obs_velocities), axis=0).transpose()
+    agent_states = np.concatenate((x[:2, :], si_velocities), axis=0).transpose()
+    safety_distance = 0.15
+    for i in range(N_robots):
         
         danger_obstacle_states = []
-        robot_state = states[i]
+        robot_state = agent_states[i]
 
         # keep safe distance to obstacles
         for obstacle_state in obstacle_states:
@@ -150,14 +154,19 @@ for k in range(iterations):
             # override si_velocities with safe control inputs.
             si_velocities[0][i] = safe_control[0]
             si_velocities[1][i] = safe_control[1]
-
+    
+    # Use the barrier certificate to avoid collisions (Robotarium Official)
+    si_velocities = si_barrier_cert(si_velocities, x_si[:,:5])
 
 
     # Transform single integrator to unicycle
     dxu = si_to_uni_dyn(si_velocities, x)
 
     # Set the velocities of agents 1,...,N
-    r.set_velocities(np.arange(N), dxu)
+    r.set_velocities(np.arange(N_robots), dxu)
+    # Update positions of obstacles
+    g.set_offsets(obs_pos.T)
+    obs_pos=obs_pos[:,:N_obs]+T*obs_velocities[:,:N_obs]
     # Iterate the simulation
     r.step()
 
