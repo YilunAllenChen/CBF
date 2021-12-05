@@ -59,7 +59,7 @@ g = r.axes.scatter(initial_conditions_obs[0,:], initial_conditions_obs[1,:], s=n
 h = r.axes.scatter(1.5, 0, s=np.pi/4*safety_radius_marker_size, marker='o', facecolors=[0,1,0],edgecolors=[0,1,0],linewidth=3)
 f = r.axes.scatter(0, 0, s=np.pi/4*safety_radius_marker_size, marker='o', facecolors='none',edgecolors=[1,0,0],linewidth=3)
 # How many iterations do we want (about N*0.033 seconds)
-iterations = 1000
+iterations = 2000
 T = 1/30
 
 # We're working in single-integrator dynamics, and we don't want the robots
@@ -82,11 +82,11 @@ L1 = np.array([
 
 # Laplacian used by free agents to rendezvous.
 L2 = np.array([
-    [-1, 0, 0, 0, 0, 1],
-    [0, -1, 0, 0, 0, 1],
-    [0, 0, -1, 0, 0, 1],
-    [0, 0, 0, -1, 0, 1],
-    [0, 0, 0, 0, -1, 1],
+    [-5, 1, 1, 1, 1, 1],
+    [1, -5, 1, 1, 1, 1],
+    [1, 1, -5, 1, 1, 1],
+    [1, 1, 1, -5, 1, 1],
+    [1, 1, 1, 1, -5, 1],
     [0, 0, 0, 0, 0, 0],
 ])
 
